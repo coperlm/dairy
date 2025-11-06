@@ -1,35 +1,42 @@
-# dependencies
+# Dependencies
 node_modules/
 
-# build output
+# Build output
 dist/
 .astro/
 
-# environment variables
+# Environment variables (contains passwords)
 .env
 .env.production
 .env.local
 
-# macOS-specific files
+# OS specific files
 .DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~
 
-# diary source files (from submodule, don't track in main repo)
+# Diary source files (managed by submodule)
 diary/*.md
 diary/.obsidian/
+diary/index.json
 
-# encrypted diary data is committed to repo for deployment
-# public/diary-data.json
+# Encrypted diary data is COMMITTED for deployment
+# DO NOT ignore: public/diary-data.json
 
-# logs
+# Logs
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
+*.log
 
-# editor directories
+# Editor directories
 .vscode/
 .idea/
+*.sublime-*
 
-# misc
-*.log
+# Misc
 .vercel
+.cache/

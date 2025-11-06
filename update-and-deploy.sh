@@ -18,15 +18,27 @@ if [ ! -f "package.json" ]; then
     exit 1
 fi
 
-# 1. 更新子模块
+# 1. 更新子模块（拉取最新日记）
 echo "📥 步骤 1/4: 更新 diary 子模块..."
-if git submodule update --remote diary 2>&1; then
-    echo "✅ 子模块更新完成"
-    STATUS_LOG="${STATUS_LOG}✅ 子模块更新\n"
+cd diary
+if git pull origin master 2>&1; then
+    cd ..
+    echo "✅ 子模块内容已拉取"
+    
+    # 更新主仓库中的子模块引用
+    if git submodule update --remote diary 2>&1; then
+        echo "✅ 子模块引用已更新"
+        STATUS_LOG="${STATUS_LOG}✅ 子模块更新\n"
+    else
+        echo "⚠️  子模块引用更新失败，但内容已拉取"
+        WARNINGS=$((WARNINGS + 1))
+        STATUS_LOG="${STATUS_LOG}⚠️  子模块引用更新失败\n"
+    fi
 else
-    echo "⚠️  子模块更新失败或无更新，继续..."
+    cd ..
+    echo "⚠️  子模块拉取失败或无更新，继续..."
     WARNINGS=$((WARNINGS + 1))
-    STATUS_LOG="${STATUS_LOG}⚠️  子模块更新失败\n"
+    STATUS_LOG="${STATUS_LOG}⚠️  子模块拉取失败\n"
 fi
 echo ""
 
