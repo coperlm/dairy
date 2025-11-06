@@ -1,0 +1,115 @@
+---
+// DiaryList component - displays encrypted diary entries
+---
+
+<div class="min-h-screen p-4 md:p-8">
+  <div class="max-w-4xl mx-auto">
+    <!-- Header -->
+    <div class="bg-white rounded-2xl shadow-lg p-6 mb-6">
+      <div class="flex justify-between items-center">
+        <h1 class="text-3xl font-bold text-gray-800">📔 我的日记</h1>
+        <button
+          id="logoutBtn"
+          class="px-4 py-2 bg-red-500 hover:bg-red-600 text-white rounded-lg transition-colors"
+        >
+          退出
+        </button>
+      </div>
+    </div>
+    
+    <!-- Diary entries container -->
+    <div id="diaryContainer" class="space-y-4">
+      <div class="text-center py-12">
+        <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600 mx-auto"></div>
+        <p class="mt-4 text-gray-600">正在加载日记...</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  import CryptoJS from 'crypto-js';
+  
+  // 检查认证状态
+  const auth = sessionStorage.getItem('diary_auth');
+  const key = sessionStorage.getItem('diary_key');
+  
+  if (!auth || !key) {
+    window.location.href = '/dairy/';
+  }
+  
+  // 退出登录
+  const logoutBtn = document.getElementById('logoutBtn');
+  logoutBtn?.addEventListener('click', () => {
+    sessionStorage.clear();
+    window.location.href = '/dairy/';
+  });
+  
+  // 解密函数
+  function decrypt(encryptedData: string, password: string): string {
+    try {
+      const bytes = CryptoJS.AES.decrypt(encryptedData, password);
+      return bytes.toString(CryptoJS.enc.Utf8);
+    } catch (error) {
+      console.error('Decryption failed:', error);
+      return '';
+    }
+  }
+  
+  // 加载并显示日记
+  async function loadDiaries() {
+    const container = document.getElementById('diaryContainer');
+    if (!container) return;
+    
+    try {
+      // 读取加密的日记索引
+      const response = await fetch('/dairy/diary-data.json');
+      const encryptedData = await response.json();
+      
+      // 解密日记数据
+      const decryptedJson = decrypt(encryptedData.data, key!);
+      if (!decryptedJson) {
+        throw new Error('解密失败');
+      }
+      
+      const diaries = JSON.parse(decryptedJson);
+      
+      // 按日期排序（最新的在前）
+      diaries.sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime());
+      
+      // 渲染日记列表
+      container.innerHTML = diaries.map((diary: any) => `
+        <div class="bg-white rounded-xl shadow-lg p-6 hover:shadow-xl transition-shadow">
+          <div class="flex justify-between items-start mb-4">
+            <h2 class="text-2xl font-bold text-gray-800">${diary.title}</h2>
+            <span class="text-sm text-gray-500">${new Date(diary.date).toLocaleDateString('zh-CN')}</span>
+          </div>
+          <div class="prose max-w-none text-gray-700">
+            ${diary.content.replace(/\n/g, '<br>')}
+          </div>
+          ${diary.tags ? `
+            <div class="mt-4 flex flex-wrap gap-2">
+              ${diary.tags.map((tag: string) => `
+                <span class="px-3 py-1 bg-primary-100 text-primary-700 rounded-full text-sm">
+                  ${tag}
+                </span>
+              `).join('')}
+            </div>
+          ` : ''}
+        </div>
+      `).join('');
+      
+    } catch (error) {
+      console.error('Failed to load diaries:', error);
+      container.innerHTML = `
+        <div class="bg-red-50 border border-red-200 rounded-xl p-6 text-center">
+          <p class="text-red-600 font-semibold">加载日记失败</p>
+          <p class="text-red-500 text-sm mt-2">请检查密码是否正确或稍后重试</p>
+        </div>
+      `;
+    }
+  }
+  
+  // 页面加载时执行
+  loadDiaries();
+</script>
