@@ -146,8 +146,7 @@ function main() {
   );
   
   console.log('✅ 日记数据加密完成！');
-  console.log(`📝 生成的密码哈希: ${generatePasswordHash(PASSWORD)}`);
-  console.log('⚠️  请将上面的哈希值复制到 src/components/Login.astro 中的 PASSWORD_HASH');
+  console.log(`� 加密了 ${diaries.length} 篇日记`);
 }
 
 main();
