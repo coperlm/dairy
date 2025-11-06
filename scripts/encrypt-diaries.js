@@ -33,14 +33,11 @@ function readDiaryFiles() {
       let date = new Date().toISOString().split('T')[0];
       let tags = [];
       let contentText = '';
-      let inFrontmatter = false;
       
       // 解析 frontmatter (如果存在)
       if (lines[0] === '---') {
-        inFrontmatter = true;
         for (let i = 1; i < lines.length; i++) {
           if (lines[i] === '---') {
-            inFrontmatter = false;
             contentText = lines.slice(i + 1).join('\n').trim();
             break;
           }
