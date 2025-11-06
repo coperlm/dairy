@@ -32,22 +32,15 @@ jobs:
       - name: Install dependencies
         run: npm ci
         
-      - name: Create empty diary structure
+      - name: Verify encrypted diary data
         run: |
-          mkdir -p diary
-          echo '{"diaries":[]}' > diary/index.json
-        
-      - name: Create encrypted diaries from secrets
-        env:
-          ENCRYPTED_DIARIES: ${{ secrets.ENCRYPTED_DIARIES }}
-        run: |
-          mkdir -p public
-          if [ -n "$ENCRYPTED_DIARIES" ]; then
-            echo "$ENCRYPTED_DIARIES" > public/diary-data.json
-            echo "✅ Using encrypted diaries from secrets"
+          if [ -f "public/diary-data.json" ]; then
+            echo "✅ Found encrypted diary data file"
+            ls -lh public/diary-data.json
           else
-            echo "⚠️  Warning: ENCRYPTED_DIARIES not set, creating empty data"
-            echo '{"data":"","timestamp":"","count":0}' > public/diary-data.json
+            echo "❌ Error: public/diary-data.json not found!"
+            echo "Please run: node scripts/encrypt-diaries.js"
+            exit 1
           fi
         
       - name: Build
