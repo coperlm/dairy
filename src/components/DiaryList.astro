@@ -63,16 +63,30 @@
     
     try {
       // 读取加密的日记索引
+      console.log('正在加载日记数据...');
       const response = await fetch('/dairy/diary-data.json');
-      const encryptedData = await response.json();
+      console.log('Response status:', response.status);
       
-      // 解密日记数据
-      const decryptedJson = decrypt(encryptedData.data, key!);
-      if (!decryptedJson) {
-        throw new Error('解密失败');
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
       }
       
+      const encryptedData = await response.json();
+      console.log('加密数据已加载, 数据长度:', encryptedData.data?.length);
+      console.log('日记数量:', encryptedData.count);
+      
+      // 解密日记数据
+      console.log('开始解密...');
+      const decryptedJson = decrypt(encryptedData.data, key!);
+      console.log('解密结果长度:', decryptedJson?.length);
+      
+      if (!decryptedJson) {
+        throw new Error('解密失败：返回空字符串');
+      }
+      
+      console.log('开始解析 JSON...');
       const diaries = JSON.parse(decryptedJson);
+      console.log('成功解析，日记数量:', diaries.length);
       
       // 按日期排序（最新的在前）
       diaries.sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime());
@@ -100,11 +114,16 @@
       `).join('');
       
     } catch (error) {
-      console.error('Failed to load diaries:', error);
+      console.error('加载日记失败:', error);
+      const errorMessage = error instanceof Error ? error.message : '未知错误';
       container.innerHTML = `
         <div class="bg-red-50 border border-red-200 rounded-xl p-6 text-center">
           <p class="text-red-600 font-semibold">加载日记失败</p>
           <p class="text-red-500 text-sm mt-2">请检查密码是否正确或稍后重试</p>
+          <details class="mt-4 text-left">
+            <summary class="cursor-pointer text-sm text-gray-600">查看错误详情</summary>
+            <pre class="mt-2 p-2 bg-gray-100 rounded text-xs overflow-auto">${errorMessage}</pre>
+          </details>
         </div>
       `;
     }
