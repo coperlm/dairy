@@ -23,7 +23,15 @@ function readDiaryFiles() {
     return createSampleData();
   }
   
-  const files = fs.readdirSync(diaryDir).filter(file => file.endsWith('.md'));
+  // 只读取日期格式的 markdown 文件 (YYYY-MM-DD.md)
+  const datePattern = /^\d{4}-\d{2}-\d{2}\.md$/;
+  const files = fs.readdirSync(diaryDir).filter(file => datePattern.test(file));
+  
+  if (files.length === 0) {
+    console.warn('警告: 未找到符合日期格式 (YYYY-MM-DD.md) 的日记文件');
+    return [];
+  }
+  
   const diaries = [];
   
   for (const file of files) {
@@ -31,10 +39,12 @@ function readDiaryFiles() {
       const filePath = path.join(diaryDir, file);
       const content = fs.readFileSync(filePath, 'utf-8');
       
+      // 从文件名提取日期 (格式: YYYY-MM-DD.md)
+      const date = file.replace('.md', '');
+      
       // 解析 markdown 文件
       const lines = content.split('\n');
-      let title = file.replace('.md', '');
-      let date = new Date().toISOString().split('T')[0];
+      let title = date; // 默认使用日期作为标题
       let tags = [];
       let contentText = '';
       
@@ -49,8 +59,6 @@ function readDiaryFiles() {
           const line = lines[i];
           if (line.startsWith('title:')) {
             title = line.replace('title:', '').trim().replace(/['"]/g, '');
-          } else if (line.startsWith('date:')) {
-            date = line.replace('date:', '').trim().replace(/['"]/g, '');
           } else if (line.startsWith('tags:')) {
             const tagsStr = line.replace('tags:', '').trim();
             tags = tagsStr.replace(/[\[\]]/g, '').split(',').map(t => t.trim().replace(/['"]/g, ''));
@@ -63,12 +71,6 @@ function readDiaryFiles() {
           contentText = lines.slice(1).join('\n').trim();
         } else {
           contentText = content.trim();
-        }
-        
-        // 尝试从文件名提取日期 (格式: YYYY-MM-DD-title.md)
-        const dateMatch = file.match(/^(\d{4}-\d{2}-\d{2})/);
-        if (dateMatch) {
-          date = dateMatch[1];
         }
       }
       
@@ -83,6 +85,9 @@ function readDiaryFiles() {
       console.error(`读取文件 ${file} 失败:`, error);
     }
   }
+  
+  // 按日期排序，最新的在前
+  diaries.sort((a, b) => b.date.localeCompare(a.date));
   
   return diaries;
 }

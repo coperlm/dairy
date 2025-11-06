@@ -15,6 +15,7 @@ dist/
 
 # diary source files (from submodule, don't track in main repo)
 diary/*.md
+diary/obsidian/
 
 # encrypted diary data is committed to repo for deployment
 # public/diary-data.json

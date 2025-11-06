@@ -50,12 +50,10 @@ npm run dev
 ### 方式 1: 一键更新（推荐）
 
 ```bash
-# Linux/Mac
 ./update-and-deploy.sh
-
-# Windows
-.\update-and-deploy.bat
 ```
+
+（其实原本是对接黑曜石的）
 
 **自动完成**:
 1. 更新 diary 子模块（拉取最新日记）
@@ -83,18 +81,23 @@ git commit -m "更新加密日记"
 git push origin main
 ```
 
----
-
 ## 📖 日记格式
 
-在 `diary/` 子模块中创建 markdown 文件：
+在 `diary/` 子模块中创建 markdown 文件。
+
+### ⚠️ 文件名规则
+
+**文件名必须是日期格式**: `YYYY-MM-DD.md`
+
+例如: `2025-11-06.md`, `2024-12-25.md`
+
+日记会按文件名日期排序，最新的显示在前面。
 
 ### 带 Frontmatter（推荐）
 
 ```markdown
 ---
 title: 今天的心情
-date: 2025-11-06
 tags: [生活, 随笔]
 ---
 
@@ -109,7 +112,7 @@ tags: [生活, 随笔]
 日记内容...
 ```
 
-文件名: `2025-11-06-title.md`
+如果没有指定 title，将使用日期作为标题。
 
 ---
 
