@@ -18,32 +18,88 @@ if [ ! -f "package.json" ]; then
     exit 1
 fi
 
-# 1. 更新子模块（拉取最新日记）
-echo "📥 步骤 1/4: 更新 diary 子模块..."
+# 1. 处理子模块（提交本地新日记 + 拉取远程更新）
+echo "📥 步骤 1/5: 处理 diary 子模块..."
 cd diary
+
+# 1.1 先拉取远程更新（如果在其他地方编辑了日记）
+echo "  🔄 拉取远程更新..."
 if git pull origin master 2>&1; then
-    cd ..
-    echo "✅ 子模块内容已拉取"
+    echo "  ✅ 远程更新已拉取"
+else
+    echo "  ⚠️  拉取远程更新失败或无更新"
+    WARNINGS=$((WARNINGS + 1))
+fi
+
+# 1.2 检查是否有本地新增或修改的日记
+if [ -n "$(git status --porcelain)" ]; then
+    echo "  📝 发现本地变化，准备提交..."
+    git status --short | sed 's/^/     /'
     
-    # 更新主仓库中的子模块引用
-    if git submodule update --remote diary 2>&1; then
-        echo "✅ 子模块引用已更新"
-        STATUS_LOG="${STATUS_LOG}✅ 子模块更新\n"
-    else
-        echo "⚠️  子模块引用更新失败，但内容已拉取"
-        WARNINGS=$((WARNINGS + 1))
-        STATUS_LOG="${STATUS_LOG}⚠️  子模块引用更新失败\n"
+    # 只添加符合日期格式的 markdown 文件
+    CHANGED_FILES=$(git status --porcelain | grep '\.md$' | awk '{print $2}')
+    if [ -n "$CHANGED_FILES" ]; then
+        echo "  ➕ 添加日记文件到暂存区..."
+        git add *.md
+        
+        # 生成提交信息
+        DIARY_TIMESTAMP=$(date +"%Y-%m-%d %H:%M:%S")
+        DIARY_COMMIT_MSG="更新日记 - ${DIARY_TIMESTAMP}"
+        
+        echo "  💾 提交到本地仓库..."
+        if git commit -m "${DIARY_COMMIT_MSG}" 2>&1; then
+            echo "  ✅ 本地提交完成"
+            
+            # 推送到远程
+            echo "  🚀 推送到远程仓库..."
+            if git push origin master 2>&1; then
+                echo "  ✅ 子模块推送成功"
+                STATUS_LOG="${STATUS_LOG}✅ 子模块提交并推送\n"
+            else
+                echo "  ❌ 子模块推送失败"
+                cd ..
+                ERRORS=$((ERRORS + 1))
+                STATUS_LOG="${STATUS_LOG}❌ 子模块推送失败\n"
+                echo ""
+                echo "=========================================="
+                echo "📊 执行统计"
+                echo "=========================================="
+                echo -e "$STATUS_LOG"
+                echo "错误: $ERRORS | 警告: $WARNINGS"
+                exit 1
+            fi
+        else
+            echo "  ❌ 子模块提交失败"
+            cd ..
+            ERRORS=$((ERRORS + 1))
+            STATUS_LOG="${STATUS_LOG}❌ 子模块提交失败\n"
+            echo ""
+            echo "=========================================="
+            echo "📊 执行统计"
+            echo "=========================================="
+            echo -e "$STATUS_LOG"
+            echo "错误: $ERRORS | 警告: $WARNINGS"
+            exit 1
+        fi
     fi
 else
-    cd ..
-    echo "⚠️  子模块拉取失败或无更新，继续..."
+    echo "  ℹ️  子模块无本地变化"
+    STATUS_LOG="${STATUS_LOG}ℹ️  子模块无变化\n"
+fi
+
+cd ..
+
+# 1.3 更新主仓库中的子模块引用
+if git submodule update --remote diary 2>&1; then
+    echo "✅ 子模块引用已更新"
+else
+    echo "⚠️  子模块引用更新失败"
     WARNINGS=$((WARNINGS + 1))
-    STATUS_LOG="${STATUS_LOG}⚠️  子模块拉取失败\n"
 fi
 echo ""
 
 # 2. 加密日记
-echo "🔐 步骤 2/4: 加密日记..."
+echo "🔐 步骤 2/5: 加密日记..."
 ENCRYPT_OUTPUT=$(node scripts/encrypt-diaries.js 2>&1)
 ENCRYPT_EXIT_CODE=$?
 
@@ -71,7 +127,7 @@ fi
 echo ""
 
 # 3. 检查是否有变化
-echo "📝 步骤 3/4: 检查文件变化..."
+echo "📝 步骤 3/5: 检查文件变化..."
 if [ -z "$(git status --porcelain)" ]; then
     echo "✅ 没有需要提交的变化"
     echo "💡 日记内容可能没有更新，或加密结果相同"
@@ -91,7 +147,7 @@ STATUS_LOG="${STATUS_LOG}✅ 检测到文件变化\n"
 echo ""
 
 # 4. 提交和推送
-echo "📦 步骤 4/4: 提交并推送到 GitHub..."
+echo "📦 步骤 4/5: 提交并推送到 GitHub..."
 git add public/diary-data.json diary
 
 # 生成提交信息
@@ -118,22 +174,6 @@ echo ""
 echo "🚀 推送到 GitHub..."
 if git push origin main 2>&1; then
     STATUS_LOG="${STATUS_LOG}✅ 推送到 GitHub\n"
-    echo ""
-    echo "=========================================="
-    echo "✅ 部署完成！"
-    echo "=========================================="
-    echo ""
-    echo "📊 执行统计:"
-    echo "=========================================="
-    echo -e "$STATUS_LOG"
-    echo "错误: $ERRORS | 警告: $WARNINGS"
-    echo ""
-    echo "🌐 等待 GitHub Actions 构建完成后访问:"
-    echo "   https://coperlm.github.io/dairy/"
-    echo ""
-    echo "📊 查看部署进度:"
-    echo "   https://github.com/coperlm/dairy/actions"
-    echo ""
 else
     echo "❌ 推送失败"
     ERRORS=$((ERRORS + 1))
@@ -146,3 +186,21 @@ else
     echo "错误: $ERRORS | 警告: $WARNINGS"
     exit 1
 fi
+echo ""
+
+# 5. 完成总结
+echo "=========================================="
+echo "✅ 部署完成！"
+echo "=========================================="
+echo ""
+echo "📊 执行统计:"
+echo "=========================================="
+echo -e "$STATUS_LOG"
+echo "错误: $ERRORS | 警告: $WARNINGS"
+echo ""
+echo "🌐 等待 GitHub Actions 构建完成后访问:"
+echo "   https://coperlm.github.io/dairy/"
+echo ""
+echo "📊 查看部署进度:"
+echo "   https://github.com/coperlm/dairy/actions"
+echo ""
