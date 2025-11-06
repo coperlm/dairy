@@ -21,20 +21,34 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          submodules: true
+          submodules: false
           
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
           node-version: 20
+          cache: 'npm'
           
       - name: Install dependencies
-        run: npm install
+        run: npm ci
         
-      - name: Encrypt diary data
+      - name: Create empty diary structure
+        run: |
+          mkdir -p diary
+          echo '{"diaries":[]}' > diary/index.json
+        
+      - name: Create encrypted diaries from secrets
         env:
-          DIARY_PASSWORD: ${{ secrets.DIARY_PASSWORD }}
-        run: node scripts/encrypt-diaries.js
+          ENCRYPTED_DIARIES: ${{ secrets.ENCRYPTED_DIARIES }}
+        run: |
+          mkdir -p public
+          if [ -n "$ENCRYPTED_DIARIES" ]; then
+            echo "$ENCRYPTED_DIARIES" > public/diary-data.json
+            echo "✅ Using encrypted diaries from secrets"
+          else
+            echo "⚠️  Warning: ENCRYPTED_DIARIES not set, creating empty data"
+            echo '{"data":"","timestamp":"","count":0}' > public/diary-data.json
+          fi
         
       - name: Build
         run: npm run build
