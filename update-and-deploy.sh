@@ -12,6 +12,15 @@ ERRORS=0
 WARNINGS=0
 STATUS_LOG=""
 
+REPO_DIR="$HOME/diary_post/dairy_website/"
+
+# 切换到目标目录
+cd "$REPO_DIR" || { echo "❌ 无法进入目录：$REPO_DIR"; exit 1; }
+
+
+# 获取当前日期时间
+COMMIT_MSG="$(date '+%Y-%m-%d %H:%M:%S')"
+
 # 检查是否在正确的目录
 if [ ! -f "package.json" ]; then
     echo "❌ 错误: 请在项目根目录运行此脚本"
