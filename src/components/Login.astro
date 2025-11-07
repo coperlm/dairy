@@ -49,22 +49,44 @@
   const passwordInput = document.getElementById('password') as HTMLInputElement;
   const errorMessage = document.getElementById('errorMessage') as HTMLElement;
   
-  // 存储加密的密码哈希值
-  const PASSWORD_HASH = '54b688a517f7654563a6c64d945a3670880a4c602ec67a065bbebbcd2b22edd5';
+  // 从服务器读取口令哈希
+  let PASSWORD_HASH = '';
+  
+  // 加载口令哈希
+  async function loadPasswordHash() {
+    try {
+      const response = await fetch('/dairy/passphrase-hash.txt');
+      if (response.ok) {
+        PASSWORD_HASH = (await response.text()).trim();
+        console.log('口令哈希已加载');
+      } else {
+        console.warn('未找到口令哈希文件,使用默认值');
+        PASSWORD_HASH = '54b688a517f7654563a6c64d945a3670880a4c602ec67a065bbebbcd2b22edd5';
+      }
+    } catch (error) {
+      console.error('加载口令哈希失败:', error);
+      PASSWORD_HASH = '54b688a517f7654563a6c64d945a3670880a4c602ec67a065bbebbcd2b22edd5';
+    }
+  }
   
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
+    
+    // 如果还没加载哈希,先加载
+    if (!PASSWORD_HASH) {
+      await loadPasswordHash();
+    }
     
     const password = passwordInput.value;
     const hash = CryptoJS.SHA256(password).toString();
     
     if (hash === PASSWORD_HASH) {
-      // 密码正确，保存到 sessionStorage
-      sessionStorage.setItem('diary_auth', hash);
-      sessionStorage.setItem('diary_key', password);
+      // 口令正确,保存认证状态和原始口令(用于 PBKDF2 密钥派生)
+      sessionStorage.setItem('diary_auth', 'true');
+      sessionStorage.setItem('diary_passphrase', password);
       window.location.href = '/dairy/diary';
     } else {
-      // 密码错误
+      // 口令错误
       errorMessage.classList.remove('hidden');
       passwordInput.value = '';
       passwordInput.focus();
@@ -74,4 +96,7 @@
       }, 3000);
     }
   });
+  
+  // 页面加载时预加载哈希
+  loadPasswordHash();
 </script>

@@ -1,61 +1,39 @@
-// 加密日记数据的构建脚本
 import fs from 'fs';
 import path from 'path';
 import CryptoJS from 'crypto-js';
 import { fileURLToPath } from 'url';
 import dotenv from 'dotenv';
 
-// 加载 .env 文件
 dotenv.config();
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+const PASSPHRASE_HASH_PATH = path.join(__dirname, '../keys/passphrase-hash.txt');
 
-// 从环境变量读取密码，如果没有则使用默认值（仅用于开发）
-const PASSWORD = process.env.DIARY_PASSWORD || 'default_password';
-
-// 读取 diary 目录中的所有 markdown 文件
 function readDiaryFiles() {
   const diaryDir = path.join(__dirname, '../diary');
+  if (!fs.existsSync(diaryDir)) return [];
   
-  if (!fs.existsSync(diaryDir)) {
-    console.warn('警告: diary 目录不存在，创建示例数据...');
-    return createSampleData();
-  }
-  
-  // 只读取日期格式的 markdown 文件 (YYYY-MM-DD.md)
   const datePattern = /^\d{4}-\d{2}-\d{2}\.md$/;
   const files = fs.readdirSync(diaryDir).filter(file => datePattern.test(file));
-  
-  if (files.length === 0) {
-    console.warn('警告: 未找到符合日期格式 (YYYY-MM-DD.md) 的日记文件');
-    return [];
-  }
-  
   const diaries = [];
   
   for (const file of files) {
     try {
       const filePath = path.join(diaryDir, file);
       const content = fs.readFileSync(filePath, 'utf-8');
-      
-      // 从文件名提取日期 (格式: YYYY-MM-DD.md)
       const date = file.replace('.md', '');
-      
-      // 解析 markdown 文件
       const lines = content.split('\n');
-      let title = date; // 默认使用日期作为标题
+      let title = date;
       let tags = [];
       let contentText = '';
       
-      // 解析 frontmatter (如果存在)
       if (lines[0] === '---') {
         for (let i = 1; i < lines.length; i++) {
           if (lines[i] === '---') {
             contentText = lines.slice(i + 1).join('\n').trim();
             break;
           }
-          
           const line = lines[i];
           if (line.startsWith('title:')) {
             title = line.replace('title:', '').trim().replace(/['"]/g, '');
@@ -65,7 +43,6 @@ function readDiaryFiles() {
           }
         }
       } else {
-        // 没有 frontmatter，第一行作为标题
         if (lines[0].startsWith('# ')) {
           title = lines[0].replace('# ', '').trim();
           contentText = lines.slice(1).join('\n').trim();
@@ -82,62 +59,52 @@ function readDiaryFiles() {
         filename: file
       });
     } catch (error) {
-      console.error(`读取文件 ${file} 失败:`, error);
+      console.error('Error reading file:', file, error.message);
     }
   }
   
-  // 按日期排序，最新的在前
   diaries.sort((a, b) => b.date.localeCompare(a.date));
-  
   return diaries;
 }
 
-// 创建示例数据（当 diary 目录不存在时）
-function createSampleData() {
-  return [
-    {
-      title: '欢迎使用加密日记本',
-      date: new Date().toISOString().split('T')[0],
-      content: '这是一个示例日记。\n\n请将你的日记 markdown 文件放在 diary 子模块中。\n\n每次构建时，这些文件会被加密并打包到网站中。',
-      tags: ['示例', '欢迎']
-    }
-  ];
-}
-
-// 加密数据
-function encryptData(data, password) {
+function encryptData(data, key) {
   const jsonStr = JSON.stringify(data);
-  const encrypted = CryptoJS.AES.encrypt(jsonStr, password).toString();
-  return encrypted;
+  return CryptoJS.AES.encrypt(jsonStr, key).toString();
 }
 
-// 生成密码哈希（用于登录验证）
-function generatePasswordHash(password) {
-  return CryptoJS.SHA256(password).toString();
-}
-
-// 主函数
 function main() {
-  console.log('🔐 开始加密日记数据...');
+  console.log('🔐 Starting diary encryption...');
   
-  // 读取日记文件
   const diaries = readDiaryFiles();
-  console.log(`📖 找到 ${diaries.length} 篇日记`);
+  console.log(`📖 Found ${diaries.length} diary entries`);
   
-  // 加密数据
-  const encryptedData = encryptData(diaries, PASSWORD);
+  // 从环境变量读取加密密钥
+  const encryptionKey = process.env.DIARY_ENCRYPTION_KEY;
   
-  // 确保 public 目录存在
+  if (!encryptionKey) {
+    console.error('');
+    console.error('❌ Error: DIARY_ENCRYPTION_KEY not found in .env file');
+    console.error('   Please run: npm run generate-keys');
+    console.error('');
+    process.exit(1);
+  }
+  
+  console.log('🔑 Loaded encryption key');
+  
+  // 用密钥加密日记数据
+  const encryptedData = encryptData(diaries, encryptionKey);
+  console.log('✅ Encrypted diary data');
+  
   const publicDir = path.join(__dirname, '../public');
   if (!fs.existsSync(publicDir)) {
     fs.mkdirSync(publicDir, { recursive: true });
   }
   
-  // 写入加密后的数据
   const outputData = {
     data: encryptedData,
     timestamp: new Date().toISOString(),
-    count: diaries.length
+    count: diaries.length,
+    version: '2.0'
   };
   
   fs.writeFileSync(
@@ -145,8 +112,20 @@ function main() {
     JSON.stringify(outputData)
   );
   
-  console.log('✅ 日记数据加密完成！');
-  console.log(`� 加密了 ${diaries.length} 篇日记`);
+  // 复制口令哈希文件到 public 目录
+  if (fs.existsSync(PASSPHRASE_HASH_PATH)) {
+    fs.copyFileSync(
+      PASSPHRASE_HASH_PATH,
+      path.join(publicDir, 'passphrase-hash.txt')
+    );
+    console.log('✅ Copied passphrase hash');
+  }
+  
+  console.log('');
+  console.log('✨ Encryption complete!');
+  console.log(`📦 Encrypted ${diaries.length} diary entries`);
+  console.log('🔐 Using AES-256 encryption');
+  console.log('');
 }
 
 main();

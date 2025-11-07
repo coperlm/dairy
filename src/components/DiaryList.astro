@@ -32,9 +32,9 @@
   
   // 检查认证状态
   const auth = sessionStorage.getItem('diary_auth');
-  const key = sessionStorage.getItem('diary_key');
+  const passphrase = sessionStorage.getItem('diary_passphrase');
   
-  if (!auth || !key) {
+  if (!auth || !passphrase) {
     window.location.href = '/dairy/';
   }
   
@@ -45,10 +45,25 @@
     window.location.href = '/dairy/';
   });
   
+  // 使用 PBKDF2 从口令派生密钥(与后端一致)
+  function deriveKey(passphrase: string): string {
+    const salt = 'diary-encryption-salt-2025';
+    const iterations = 100000;
+    const keySize = 256 / 32; // 32 bytes
+    
+    const key = CryptoJS.PBKDF2(passphrase, salt, {
+      keySize: keySize,
+      iterations: iterations,
+      hasher: CryptoJS.algo.SHA256
+    });
+    
+    return key.toString(CryptoJS.enc.Hex);
+  }
+  
   // 解密函数
-  function decrypt(encryptedData: string, password: string): string {
+  function decrypt(encryptedData: string, key: string): string {
     try {
-      const bytes = CryptoJS.AES.decrypt(encryptedData, password);
+      const bytes = CryptoJS.AES.decrypt(encryptedData, key);
       return bytes.toString(CryptoJS.enc.Utf8);
     } catch (error) {
       console.error('Decryption failed:', error);
@@ -62,41 +77,49 @@
     if (!container) return;
     
     try {
-      // 读取加密的日记索引
       console.log('正在加载日记数据...');
+      
+      // 从口令派生解密密钥
+      const passphrase = sessionStorage.getItem('diary_passphrase');
+      if (!passphrase) {
+        throw new Error('未找到口令');
+      }
+      
+      const decryptionKey = deriveKey(passphrase);
+      console.log('已派生解密密钥');
+      
       const response = await fetch('/dairy/diary-data.json');
-      console.log('Response status:', response.status);
       
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
       }
       
-      const encryptedData = await response.json();
-      console.log('加密数据已加载, 数据长度:', encryptedData.data?.length);
-      console.log('日记数量:', encryptedData.count);
+      const data = await response.json();
+      console.log('数据已加载,版本:', data.version || '2.0');
       
       // 解密日记数据
       console.log('开始解密...');
-      const decryptedJson = decrypt(encryptedData.data, key!);
-      console.log('解密结果长度:', decryptedJson?.length);
+      const decryptedJson = decrypt(data.data, decryptionKey);
       
       if (!decryptedJson) {
-        throw new Error('解密失败：返回空字符串');
+        throw new Error('解密失败');
       }
       
-      console.log('开始解析 JSON...');
       const diaries = JSON.parse(decryptedJson);
-      console.log('成功解析，日记数量:', diaries.length);
+      console.log('成功解密,日记数量:', diaries.length);
       
-      // 按日期排序（最新的在前）
+      // 按日期排序
       diaries.sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime());
       
       // 渲染日记列表
       container.innerHTML = diaries.map((diary: any) => `
         <div class="bg-white rounded-xl shadow-lg p-6 hover:shadow-xl transition-shadow">
-          <h2 class="text-2xl font-bold text-gray-800 mb-4">${diary.title}</h2>
-          <div class="prose max-w-none text-gray-700">
-            ${diary.content.replace(/\n/g, '<br>')}
+          <div class="flex justify-between items-start mb-2">
+            <h2 class="text-2xl font-bold text-gray-800">${diary.title}</h2>
+            <span class="text-sm text-gray-500">${diary.date}</span>
+          </div>
+          <div class="prose max-w-none text-gray-700 whitespace-pre-wrap">
+            ${diary.content}
           </div>
           ${diary.tags ? `
             <div class="mt-4 flex flex-wrap gap-2">
@@ -115,12 +138,14 @@
       const errorMessage = error instanceof Error ? error.message : '未知错误';
       container.innerHTML = `
         <div class="bg-red-50 border border-red-200 rounded-xl p-6 text-center">
-          <p class="text-red-600 font-semibold">加载日记失败</p>
-          <p class="text-red-500 text-sm mt-2">请检查密码是否正确或稍后重试</p>
-          <details class="mt-4 text-left">
-            <summary class="cursor-pointer text-sm text-gray-600">查看错误详情</summary>
-            <pre class="mt-2 p-2 bg-gray-100 rounded text-xs overflow-auto">${errorMessage}</pre>
-          </details>
+          <p class="text-red-600 font-semibold">😕 加载日记失败</p>
+          <p class="text-red-500 text-sm mt-2">${errorMessage}</p>
+          <button
+            onclick="sessionStorage.clear(); window.location.href='/dairy/';"
+            class="mt-4 px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600"
+          >
+            重新登录
+          </button>
         </div>
       `;
     }

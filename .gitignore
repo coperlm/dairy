@@ -10,6 +10,11 @@ dist/
 .env.production
 .env.local
 
+# RSA 密钥文件 (私钥已加密,可以提交)
+# keys/private.pem - 已用口令加密,可提交
+# keys/public.pem - 公钥,可提交
+# keys/password-hash.txt - 口令哈希,可提交
+
 # OS specific files
 .DS_Store
 Thumbs.db
